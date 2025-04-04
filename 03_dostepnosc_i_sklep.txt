@@ -1,0 +1,10 @@
+# Moduły Rozszerzeń: Dostępność i Mikrotransakcje
+
+## accessibility/
+- `screen_reader.py`: metoda `speak(text)`, w przyszłości integracja z TTS
+- `visual_cues.py`: metoda `show_caption(text)` – dynamiczne opisy wydarzeń
+
+## store/
+- `microtransactions.py`: klasa `Store`, metoda `purchase(item)`, `is_owned(item)`
+
+Już teraz te moduły mają swoje miejsce w strukturze, nawet jeśli są puste.

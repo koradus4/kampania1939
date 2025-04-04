@@ -1,0 +1,17 @@
+# Cel Refaktoryzacji i Nowa Struktura Projektu
+
+Celem refaktoryzacji jest uporządkowanie projektu gry strategicznej "Alternatywna Kampania Wrześniowa 1939" w sposób, który:
+
+- Zwiększa czytelność i modułowość kodu
+- Zachowuje istniejącą funkcjonalność edytorów (mapy i żetonów)
+- Przygotowuje miejsce pod systemy tur, ekonomii, sojuszy, AI, dostępności itd.
+
+## Nowa struktura katalogów:
+- core/ – logika podstawowa gry (jednostki, mapa, stan gry)
+- engine/ – systemy rozgrywki (tury, ekonomia, rozkazy, widoczność, sojusze, zwiad)
+- gui/ – interfejs użytkownika (Tkinter, edytory)
+- data/ – mapy, tokeny, scenariusze
+- assets/ – grafiki, tła, dźwięki
+- accessibility/ – dostępność dla niewidomych/niesłyszących
+- store/ – mikrotransakcje, DLC
+- main.py – punkt startowy z GUI

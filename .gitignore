@@ -1,0 +1,42 @@
+# 🐍 Python - pliki tymczasowe i cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# 📁 VS Code
+.vscode/
+*.code-workspace
+
+# 🗺 Pliki mapy, grafik, dźwięków (jeśli generujesz)
+*.png
+*.jpg
+*.jpeg
+*.psd
+*.xcf
+*.wav
+*.mp3
+*.ogg
+
+# 🧾 JSON cache i dane tymczasowe
+*.tmp
+*.log
+*.bak
+
+# 🧪 Pliki testowe
+test_*.py
+*_test.py
+
+# ⚙️ Systemowe
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# 📦 Wirtualne środowiska (jeśli używasz)
+env/
+venv/
+ENV/
+
+# 🧩 Pliki sesji edytora
+*.sublime-workspace
+*.swp
+*.swo

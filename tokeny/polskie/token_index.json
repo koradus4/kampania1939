@@ -1,0 +1,68 @@
+{
+  "Polska P Pluton": {
+    "directory": "Polska P Pluton",
+    "nation": "Polska",
+    "unit_type": "P",
+    "unit_size": "Pluton"
+  },
+  "Polska K Pluton": {
+    "directory": "Polska K Pluton",
+    "nation": "Polska",
+    "unit_type": "K",
+    "unit_size": "Pluton"
+  },
+  "Polska TC Pluton": {
+    "directory": "Polska TC Pluton",
+    "nation": "Polska",
+    "unit_type": "TC",
+    "unit_size": "Pluton"
+  },
+  "Polska TŚ Pluton": {
+    "directory": "Polska TŚ Pluton",
+    "nation": "Polska",
+    "unit_type": "TŚ",
+    "unit_size": "Pluton"
+  },
+  "Polska TL Pluton": {
+    "directory": "Polska TL Pluton",
+    "nation": "Polska",
+    "unit_type": "TL",
+    "unit_size": "Pluton"
+  },
+  "Polska TS Pluton": {
+    "directory": "Polska TS Pluton",
+    "nation": "Polska",
+    "unit_type": "TS",
+    "unit_size": "Pluton"
+  },
+  "Polska AC Pluton": {
+    "directory": "Polska AC Pluton",
+    "nation": "Polska",
+    "unit_type": "AC",
+    "unit_size": "Pluton"
+  },
+  "Polska AL Pluton": {
+    "directory": "Polska AL Pluton",
+    "nation": "Polska",
+    "unit_type": "AL",
+    "unit_size": "Pluton"
+  },
+  "Polska AP Pluton": {
+    "directory": "Polska AP Pluton",
+    "nation": "Polska",
+    "unit_type": "AP",
+    "unit_size": "Pluton"
+  },
+  "Polska D Pluton": {
+    "directory": "Polska D Pluton",
+    "nation": "Polska",
+    "unit_type": "D",
+    "unit_size": "Pluton"
+  },
+  "Polska G Pluton": {
+    "directory": "Polska G Pluton",
+    "nation": "Polska",
+    "unit_type": "G",
+    "unit_size": "Pluton"
+  }
+}

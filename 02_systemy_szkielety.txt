@@ -1,0 +1,12 @@
+# Szkielety Systemów Rozgrywki
+
+W katalogu `engine/` umieszczamy moduły odpowiadające za mechaniki gry:
+
+- `turns.py`: klasa `TurnManager` obsługująca kolejność faz i tur
+- `economy.py`: klasa `EconomySystem`, śledzi punkty ekonomiczne, zaopatrzenie
+- `orders.py`: klasa `Order`, typ rozkazu (atak, obrona), przekazanie generałom
+- `alliances.py`: `AllianceSystem`, negocjacje sojuszy, losowość
+- `recon.py`: `ReconSystem`, `AirStrikeSystem` – zwiad i naloty
+- `visibility.py`: `VisibilitySystem`, kontrola fog of war
+
+Każdy moduł ma minimalną klasę i metody (np. `start_turn()`, `perform_recon()`), nawet jeśli tymczasowo drukują tylko komunikaty.

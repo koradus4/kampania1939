@@ -1,0 +1,15 @@
+# Zachowanie Edytorów i Menu Główne
+
+## Edytory:
+- `gui/map_editor.py` – przeniesiony działający edytor mapy
+- `gui/token_editor.py` – przeniesiony działający edytor żetonów
+- Importy i ścieżki zaktualizowane
+
+## main.py:
+- GUI (Tkinter): menu z opcjami:
+  - Nowa Gra
+  - Edytor Mapy
+  - Edytor Żetonów
+  - Wyjście
+
+To główny punkt startowy projektu, uruchamiany w VS Code.

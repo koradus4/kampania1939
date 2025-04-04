@@ -1,0 +1,316 @@
+Rozpoczynam dokładną analizę Twojego projektu gry z archiwum `kampania_wrzesniowa_1939 (4).zip`. Skupię się na integracji systemu ekonomii, zaopatrzenia, baz, losowych zdarzeń, wsparcia sojuszników, pogody, edytorów mapy i żetonów oraz logiki punktów ekonomicznych. Przygotuję zoptymalizowane rozwiązania, które można od razu włączyć do pliku `plan_gry.md`, w tym tabele wartości domyślnych i sugestie modyfikacji modułów.
+
+# Plan integracji systemu ekonomii, zaopatrzenia i powiązanych mechanik
+
+## Analiza stanu obecnego
+
+### System ekonomii i zaopatrzenia (PE/PZ)
+Aktualnie gra posiada klasę `EconomySystem` obsługującą ekonomię. Dla każdej nacji przechowywane są **Punkty Ekonomiczne (PE)** i **Punkty Zaopatrzenia (PZ)**. Na start Polska ma 1000 PE i 500 PZ, zaś Niemcy 2000 PE i 1000 PZ. Klasa udostępnia metody do modyfikacji tych wartości, dodawania przychodu i wydatków, konwersji punktów ekonomicznych na zaopatrzenie oraz resetowania stanu. 
+
+- **Punkty ekonomiczne (PE):** Służą jako zasoby produkcyjne/finansowe. Obecne metody pozwalają dodawać przychód (`add_income`) oraz odejmować wydatki (`add_expense` i `spend_economic_points`). W kodzie nie ma jeszcze automatycznego wykorzystania tych metod podczas rozgrywki – są wywoływane tylko w testach. Brak jest też ograniczeń poza globalnym maksimum 5000 PE.
+- **Punkty zaopatrzenia (PZ):** Reprezentują zasoby logistyczne potrzebne do utrzymania jednostek. Analogicznie, można je modyfikować metodami (`modify_supply_points`). Globalny limit to 2000 PZ. Aktualnie nie ma implementacji automatycznego zużycia PZ na utrzymanie w przebiegu tury (poza testową metodą `pay_unit_maintenance`). 
+- **Konwersja PE → PZ:** Istnieje metoda `produce_supply(nation, cost, amount)` pozwalająca wydatkować punkty ekonomiczne w zamian za określoną liczbę punktów zaopatrzenia. Przykładowo, w testach wywołanie `produce_supply("Polska", 300, 150)` zmniejsza PE o 300 i zwiększa PZ o 150. Oznacza to bieżący **kurs wymiany 2:1** (2 PE za 1 PZ). Obecnie brak interfejsu do ręcznego skorzystania z tej konwersji podczas rozgrywki – jest to tylko funkcja wewnętrzna.
+- **Utrzymanie jednostek:** W `EconomySystem` jest metoda `pay_unit_maintenance(nation, cost_per_unit, unit_count)`, która odejmuje z puli PZ koszt utrzymania pewnej liczby jednostek. Na ten moment nie jest ona automatycznie wywoływana co turę (metoda `process_turn` wywołuje ją, ale `process_turn` nie jest jeszcze podpięty do mechaniki tur w `main.py`). Dodatkowo istnieje rozbudowana metoda `calculate_maintenance` próbująca symulować pobór zaopatrzenia przez każdą jednostkę z najbliższej bazy – jednak w aktualnej fazie projektu jednostki nie są powiązane z bazami, więc ta funkcjonalność nie jest wykorzystywana.
+
+Podsumowując, system ekonomiczny jest zarysowany – gromadzi punkty i ma operacje konwersji oraz utrzymania – lecz **nie został w pełni zintegrowany z przebiegiem gry**. Brakuje wywołań tych mechanizmów podczas zmiany tury i interfejsu dla gracza.
+
+### Bazy zaopatrzeniowe
+Koncept baz zaopatrzeniowych jest obecny szczątkowo. W `EconomySystem` istnieje lista `bases` dla każdej nacji oraz metoda `add_base(nation, x, y, supply_limit)` do dodania bazy z limitem zaopatrzenia. Dodane bazy są przechowywane jako słowniki z polami `coords` (współrzędne heksu) i `supply_limit` (maksymalna ilość zaopatrzenia dostępna) wewnątrz listy `bases` danej nacji. Obecnie domyślnie żadnych baz nie dodano (listy startują puste). 
+
+Kod posiada też funkcję `find_nearest_base` do wyszukania najbliższej bazy względem jednostki, a `calculate_maintenance` wykorzystuje ją by określić dystans i potencjalnie zmniejszyć limit zaopatrzenia bazy przy zaopatrywaniu jednostek. Jednakże, **brak jest integracji baz z edytorem mapy lub z rozgrywką** – nie ma sposobu, aby zdefiniować bazy w scenariuszu, ani by gracz mógł je tworzyć podczas gry. W efekcie funkcjonalności baz (limit lokalnego zaopatrzenia, zaopatrywanie według odległości) pozostają nieaktywne.
+
+### Wsparcie sojuszników
+Wsparcie od sojuszników zostało częściowo zaimplementowane wewnątrz systemu ekonomii jako metoda `calculate_support_from_allies(nation, allies)`. Jej działanie polega na iteracji po przekazanym słowniku sojuszników z deklarowanym maksymalnym wsparciem i losowym przydziale części tego wsparcia (losowany procent od 1 do 100). Wynik jest sumowany i dodawany jako dodatkowy przychód ekonomiczny danej nacji (`add_income`). Przykładowo, dla sojusznika z maksymalnie 100 PE wsparcia, losowy rzut może dodać proporcjonalnie np. 60 PE, co jest raportowane w konsoli komunikatem: *„Sojusznik X przyznał 60 punktów ekonomicznych dla Polski (rzut: 60)”*.
+
+Ten mechanizm nie jest aktualnie wywoływany w trakcie gry – brak systemu sojuszy przekazującego realne dane do `calculate_support_from_allies`. Również nie ma GUI pozwalającego np. poprosić o wsparcie. Funkcja stanowi **przygotowany szkielet** pod ewentualne przyszłe wydarzenia sojusznicze lub mechanikę dyplomacji, ale **nie wpływa** jeszcze na rozgrywkę.
+
+### Zdarzenia losowe
+System ekonomii zawiera także metodę `random_event(nation)`, która definiuje pulę czterech przykładowych zdarzeń ekonomicznych:
+- *Kryzys gospodarczy* (–500 PE),
+- *Boom gospodarczy* (+500 PE),
+- *Niedobór zaopatrzenia* (–200 PZ),
+- *Dostawa zaopatrzenia* (+200 PZ).
+
+Przy wywołaniu wybierane jest losowo jedno z tych zdarzeń i jego efekty są przykładane do wskazanej nacji (modyfikacja punktów). Informacja jest logowana w historii zdarzeń (`history`) danej nacji oraz wypisana w konsoli. Podobnie jak powyżej, **nie podłączono tego mechanizmu do przebiegu tur** – jedynie metoda `process_turn` w `EconomySystem` wywołuje `random_event` na koniec przetwarzania tury, lecz `process_turn` nie jest jeszcze nigdzie wywoływana w głównym kodzie gry. W rezultacie **zdarzenia losowe nie pojawiają się w normalnej rozgrywce**. Stanowią one zalążek systemu losowości (np. zdarzeń ekonomicznych), który wymaga włączenia w cykl tury.
+
+### Punkty kluczowe
+**Punkty kluczowe** (strategiczne) zostały częściowo zaimplementowane. Edytor mapy pozwala oznaczać wybrane heksy jako punkty kluczowe o określonym typie i wartości. Struktura danych w pliku mapy (`mapa_dane.json` oraz roboczym `dane_terenow_hexow_working.json`) zawiera pole `"key_points"` ze słownikiem punktów kluczowych. Każdy wpis ma klucz w formacie `"kolumna_wiersz"` i wartość zawierającą typ punktu oraz jego wartość (punktację). Przykładowo, punkt typu *"miasto"* może mieć wartość 100 (jak w dostarczonym JSON trzy miasta o wartości 100). W edytorze można dodać punkt kluczowy wybierając typ z listy („most”, „miasto”, „węzeł komunikacyjny”, „fortyfikacja”) – odpowiadają im domyślne wartości 50, 100, 75, 150 – oraz przypisać go do wybranego heksa. Mechanizm edytora zapisuje te dane do pliku mapy.
+
+W trakcie gry punkty kluczowe mogą zostać **zdobyte** przez gracza. W `EconomySystem` zdefiniowano metodę `capture_key_point(nation, hex_id)`, która sprawdza czy dany heks jest kluczowy i jeśli tak:
+- dodaje odpowiednią wartość punktów ekonomicznych dla danej nacji (`add_income` o wartość punktu),
+- wypisuje informację o zdobyciu (*„Nacja X zdobyła kluczowy punkt 'typ' ... i otrzymała Y punktów ekonomicznych.”*),
+- usuwa ten punkt z listy dostępnych (aby nie można było zdobyć ponownie).
+
+Aby ta mechanika zadziałała, punkty kluczowe muszą zostać wczytane. Służy do tego metoda `load_key_points(file_path)`, która ładuje plik JSON i zapisuje punkty do atrybutu `self.key_points`. W kodzie testowym jest wywoływana dla pliku roboczego mapy, natomiast w grze głównej *prawdopodobnie brakuje automatycznego wczytania* (nie widać wywołania `load_key_points` w `main.py`). Możliwe, że zostało to przeoczone lub planowane do dodania. W efekcie **zdobywanie punktów kluczowych może nie działać** bez ręcznego wczytania ich danych. Sama funkcjonalność jednak jest gotowa po stronie logiki – **zdobycie dodaje PE** zgodnie z wartością punktu.
+
+### Generowanie i rozmieszczanie jednostek
+Obecny prototyp nie posiada pełnego systemu **produkcji jednostek za punkty**. Dostępne jednostki są wczytywane z folderów `tokeny/` i od razu dodawane do paneli nacji, skąd gracz może je przeciągać na mapę. W kodzie `main.py` podczas inicjalizacji nowej gry skanowane są wszystkie katalogi z żetonami i każda znaleziona jednostka jest dodawana do odpowiedniego panelu bez żadnego kosztu. Oznacza to, że **gracz ma natychmiastowy dostęp do wszystkich zdefiniowanych żetonów**. Nie ma ograniczeń liczebnych poza tym, że w obecnej implementacji każda jednostka występuje tylko raz – po przeciągnięciu jej na mapę, zostaje usunięta z panelu. Jeśli zostanie usunięta z mapy (przeciągnięta z powrotem), wraca do panelu. Ta logika wskazuje na brak możliwości posiadania duplikatów tego samego typu jednocześnie. Dodatkowo, **rozmieszczenie nie wpływa na ekonomię** – nie ubywają PE ani PZ przy stawianiu jednostki.
+
+Podsumowując, **generowanie jednostek nie jest powiązane z systemem ekonomii**. Brakuje mechanizmu kupowania nowych jednostek za punkty oraz mechanizmu ograniczania ich liczby przez zasoby. Obecnie funkcjonuje to jak nieograniczony „magazyn” dostępnych jednostek, co z punktu widzenia docelowej gry strategicznej wymaga rozbudowy.
+
+## Proponowane rozwiązania i usprawnienia
+
+Poniżej przedstawiono plan usprawnienia poszczególnych systemów, tak aby działały spójnie i były zrównoważone w przyszłej rozgrywce.
+
+### Domyślne koszty i utrzymanie jednostek
+Aby zbalansować ekonomię, należy ustalić **domyślne wartości kosztu zakupu (PE)** oraz **kosztu utrzymania (PZ)** dla każdego typu jednostki. W projekcie zdefiniowano już takie wartości dla różnych kategorii w edytorze żetonów – poniższa tabela podsumowuje je dla jednostek szczebla *pluton* (najmniejsza jednostka):
+
+| Typ jednostki  | Koszt zakupu (PE) | Koszt utrzymania (PZ/turowo) |
+|--------------- |------------------:|-----------------------------:|
+| **P** (Piechota)         | 18   | 2   |
+| **K** (Kawaleria)        | 20   | 3   |
+| **TC** (Czołgi ciężkie)  | 24   | 5   |
+| **TŚ** (Czołgi średnie)  | 22   | 4   |
+| **TL** (Czołgi lekkie)   | 20   | 3   |
+| **TS** (Czołgi szybkie/rozpoznawcze) | 18   | 2   |
+| **AC** (Artyleria ciężka)| 22   | 3   |
+| **AL** (Artyleria lekka) | 20   | 3   |
+| **AP** (Artyleria ppanc.)| 18   | 3   |
+| **Z** (Zaopatrzenie)**†**      | 16   | 2   |
+| **D** (Dowództwo)**‡**         | 60   | 0   |
+| **G** (Specjalna/**G**)**‡**   | 60   | 0   |
+
+<small>**Źródło:** wartości na podstawie domyślnych danych w `token_editor.py`.</small>  
+<small>**†** Jednostka zaopatrzeniowa (np. ciężarówka zaopatrzenia) – relatywnie tania, umiarkowane utrzymanie.</small>  
+<small>**‡** Specjalne jednostki (np. dowództwo, sztab) – wysoki jednorazowy koszt, brak kosztów utrzymania.</small>
+
+Wartości te wydają się rozsądne jako punkt wyjścia do balansu. Można zauważyć, że większe jednostki mają koszty wielokrotności tych z plutonu (mniej więcej *Kompania* = 2× pluton, *Batalion* = 3× pluton dla wielu typów). Należy zachować te proporcje, tak aby gracze mieli wybór między większymi formacjami a większą liczbą mniejszych jednostek:
+- **Infantry (Piechota P):** najtańsza podstawowa jednostka, koszt rośnie liniowo (np. kompania ~36 PE, batalion ~54 PE) a utrzymanie ~2/4/8 PZ.
+- **Cavalry (K):** nieco droższa od piechoty ze względu na mobilność (pluton 20 PE, batalion ~60 PE) i wyższe utrzymanie.
+- **Tanks:** zróżnicowane – lekkie i szybkie (TL, TS) są tańsze (18–20 PE pluton) niż średnie (TŚ 22) i ciężkie (TC 24). Utrzymanie czołgów jest znacząco wyższe (do 5 PZ/pluton ciężkich). To oddaje większe zapotrzebowanie na zaopatrzenie paliwa i części.
+- **Artillery:** koszt podobny do czołgów lekkich/średnich, utrzymanie umiarkowane (np. 3 PZ/pluton). Cięższa artyleria (AC) ma większy koszt zakupu niż lekka (AL, AP).
+- **Supply (Z):** bardzo niskie koszty zakupu (16) i utrzymania (2) – sugeruje się, że są to np. ciężarówki zaopatrzeniowe konieczne do logistyki. 
+- **Dowództwo/HQ (D, G):** traktowane jako specjalne – koszt 60, brak utrzymania. Możliwe, że reprezentują sztaby lub grupy operacyjne; ich brak kosztu utrzymania oznacza, że nie obciążają logistyki po rozmieszczeniu.
+
+**Zalecenie:** Utrzymać powyższe wartości jako domyślne. W razie potrzeby doprecyzować typy `D` i `G` (np. czy `G` to sztab generalny, lotnictwo czy inny element) i ewentualnie rozszerzyć listę typów. Domyślne wartości powinny być przechowywane w jednym miejscu (np. w pliku konfiguracyjnym JSON lub centralnej strukturze) – obecnie są zaszyte w kodzie edytora żetonów. **Lepiej przenieść je do pliku** (np. `data/default_unit_stats.json`), z którego edytor i gra mogłyby je odczytywać, ułatwiając balansowanie bez zmian kodu.
+
+### Konwersja punktów ekonomicznych na zaopatrzenie (PE → PZ)
+Aby powiązać ze sobą system ekonomii i logistyki, należy umożliwić **ręczne konwertowanie** punktów ekonomicznych na punkty zaopatrzenia przez gracza podczas rozgrywki. Obecnie mechanika ta jest zaszyta w funkcji `produce_supply`, ale brak interfejsu – planowane usprawnienia:
+- **Stały kurs wymiany:** Utrzymać domyślny kurs 2 PE = 1 PZ (zgodnie z testowym wykorzystaniem 300→150). Kurs ten można ewentualnie zbalansować w przyszłości, ale na start jest intuicyjny (wydajność gospodarczą przelicza się na połowę efektywności logistycznej).
+- **Interfejs GUI konwersji:** W panelu informacji ekonomicznych lub w menu akcji nacji dodać przycisk **„Konwertuj zasoby”**. Po kliknięciu pojawia się okno dialogowe pozwalające graczowi wprowadzić, ile punktów ekonomicznych chce zamienić na zaopatrzenie. Można też dodać szybkie opcje (np. +50 PZ za 100 PE, +100 PZ za 200 PE).
+- **Weryfikacja i wykonanie:** Po zatwierdzeniu należy wywołać `economy_system.produce_supply(nation, cost, supply_amount)`. Należy upewnić się, że gracz ma wystarczającą liczbę PE – jeśli nie, interfejs powinien zablokować taką transakcję lub wyświetlić komunikat (metoda już to sprawdza i drukuje ostrzeżenie w konsoli, ale powinno to być przeniesione do komunikatu GUI).
+- **Ograniczenia i cooldown:** Dla balansu można rozważyć ograniczenie częstotliwości lub maksymalnego jednorazowego transferu (np. nie więcej niż 50% aktualnych PE na turę), aby gracz nie mógł w jednej chwili przepalić całej gospodarki na zaopatrzenie. Na początek jednak można nie wprowadzać sztucznych limitów – sam fakt, że zasoby są ograniczone kwotą PE, jest limitem.
+
+Integrując konwersję, stworzymy **pomost między ekonomią a zaopatrzeniem**: nadwyżki finansowe gracz może przeznaczyć na podtrzymanie armii. To ważne, szczególnie gdy koszty utrzymania rosną wraz z liczbą jednostek.
+
+Dodatkowo warto rozważyć **automatyczną konwersję na koniec tury**: np. określony ułamek niewykorzystanych PE mógłby przechodzić na PZ (symulacja inwestowania w zapasy). Jednak takie reguły powinny być czytelne dla gracza – na razie lepiej trzymać się podejścia manualnego, by dać graczowi pełną kontrolę.
+
+### Struktura danych baz zaopatrzenia i punktów kluczowych (JSON)
+Obecna struktura pliku mapy przechowuje jedynie teren i punkty kluczowe. Proponuje się ujednolicenie i rozszerzenie formatu JSON o informację o **bazach zaopatrzeniowych** oraz ewentualnie przypisanie punktów kluczowych do nacji (jeśli startowo jakieś punkty są już w posiadaniu stron).
+
+**Propozycja 1:** Rozszerzenie pliku mapy (np. `mapa_dane.json`) o sekcje dla baz. Można dodać nowy klucz top-level, np. `"bases"`, którego wartość będzie słownikiem zawierającym listy baz dla poszczególnych nacji:
+```json
+{
+  "terrain": { ... },
+  "key_points": {
+    "4_3": { "type": "miasto", "value": 100 },
+    "...": { ... }
+  },
+  "bases": {
+    "Polska": [
+      { "coords": [x, y], "supply_limit": 500 },
+      { "coords": [x2, y2], "supply_limit": 300 }
+    ],
+    "Niemcy": [
+      { "coords": [u, v], "supply_limit": 400 }
+    ]
+  }
+}
+```
+Taka struktura pozwala zdefiniować dowolną liczbę baz dla każdej strony wraz z ich położeniem i początkowym limitem zaopatrzenia (maksymalnym zapasem/zdolnością zaopatrywania). Wczytanie tych danych zapewni metoda np. `load_bases(file_path)` w `EconomySystem`, analogiczna do `load_key_points`. Przy starcie scenariusza gra wywoła `economy_system.load_key_points(...)` oraz `economy_system.load_bases(...)` wskazując plik mapy/scenariusza. 
+
+**Propozycja 2:** Alternatywnie, jeśli chcemy rozdzielić dane scenariusza od danych mapy, możemy stworzyć osobny plik **scenariusza** (np. `scenario_1939.json`) który zawiera zarówno nazwę mapy jak i dodatkowe informacje:
+```json
+{
+  "map": "mapa1",
+  "start_resources": {
+    "Polska": { "PE": 1000, "PZ": 500 },
+    "Niemcy": { "PE": 2000, "PZ": 1000 }
+  },
+  "bases": { ... jak wyżej ... },
+  "key_points": { ... jak wyżej ... },
+  "initial_units": { ... jeśli przewidujemy startowe jednostki rozstawione ... }
+}
+```
+Wówczas plik mapy pozostałby czysto geograficzny (heksy i tereny), a plik scenariusza definiowałby ekonomię i rozmieszczenie. To bardziej kompleksowe podejście, które ułatwi tworzenie różnych scenariuszy na tej samej mapie. Jednak implementacyjnie wymaga to obsługi dwóch plików i jest nieco bardziej złożone.
+
+Na potrzeby najbliższego etapu można wdrożyć pierwszą, prostszą propozycję – dodać bazy do pliku mapy. Punkty kluczowe już są tam zawarte jako `"key_points"`. Warto upewnić się, że format zapisu punktów kluczowych nie wymaga przypisania do strony (na ogół punkty kluczowe są neutralne do momentu zajęcia, co obecny format odzwierciedla brakiem informacji o właścicielu).
+
+**Podsumowanie struktury:**
+- **key_points:** słownik `hex_id -> {type, value}` (neutralne, wartość punktów dodawana zdobywcy).
+- **bases:** słownik `nation -> [ {coords: [x,y], supply_limit: N}, ... ]` (pozycje baz danej nacji z ich pojemnością zaopatrzenia).
+
+Przechowywanie tych informacji w JSON pozwoli edytorowi mapy i głównej grze korzystać ze spójnego źródła danych. Ułatwi to też modyfikacje scenariusza (np. dodanie nowej bazy – wystarczy edycja pliku zamiast zmian w kodzie).
+
+### Interfejs GUI – konwersja zasobów i tworzenie baz
+Aby mechanizmy konwersji zasobów i budowy baz były dostępne dla gracza, należy rozbudować interfejs użytkownika o odpowiednie elementy sterujące.
+
+**1. Konwersja PE → PZ:**  
+Dodajmy przycisk w panelu ekonomii, np. **„Konwertuj PE na PZ”**. Po jego kliknięciu otworzy się okno dialogowe (można wykorzystać `tkinter.simpledialog` lub własne okno) z pytaniem o liczbę punktów do konwersji. Możliwe parametry:
+- Domyślnie może być wpisana maksymalna możliwa liczba (całe dostępne PE) lub połowa.
+- Po zatwierdzeniu gra wywołuje metodę `economy_system.produce_supply(current_nation, cost, converted_supply)`, gdzie `converted_supply` = `cost/2` przy założeniu kursu 2:1. Można też pozwolić graczowi wpisać bezpośrednio ile PZ chce uzyskać, a koszt obliczać automatycznie.
+- Wynik powinien zaktualizować natychmiast **panel informacji ekonomicznych**. Należy więc wywołać `update_economic_info()` po dokonaniu konwersji, aby odświeżyć wyświetlane wartości.
+
+Od strony kodu, implementacja może być wykonana w klasie `GameInterface` (w `main.py`). Można dodać metodę `open_convert_dialog()` obsługującą ten dialog, a przycisk stworzyć podczas inicjalizacji panelu ekonomii (np. poniżej tekstowego pola informacji). Stylowo, przycisk może być mały i opisany np. "Konwertuj..." z ikoną zasobów dla czytelności.
+
+**2. Tworzenie nowych baz zaopatrzenia:**  
+Budowa bazy przez gracza to istotny element strategii (np. gracz wycofuje się i tworzy linię zaopatrzenia z tyłu). Proponowane rozwiązanie:
+- Dodaj przycisk **„Zbuduj bazę zaopatrzenia”** dostępny dla gracza (np. w menu akcji tury albo w panelu nacji). Można go umieścić obok przycisku „Zakończ turę” lub w innym dobrze widocznym miejscu.
+- Po kliknięciu, gracz powinien wybrać heks na mapie, gdzie baza zostanie utworzona. Technicznie: po wciśnięciu przycisku interfejs może przejść w tryb wyczekiwania na wskazanie heksu (np. zmienna w `GameInterface` `placing_base_mode = True`). Można też otworzyć okno dialogowe z prośbą „Kliknij na mapie, gdzie utworzyć bazę” – i następne kliknięcie na mapie, obsługiwane w metodzie `on_hex_press` lub podobnej, sprawdzi ten tryb i wykona akcję bazy zamiast normalnego działania.
+- **Koszt utworzenia bazy:** Należy zdefiniować, ile kosztuje postawienie nowej bazy. Racjonalnie mogłoby to być znaczące obciążenie **punktów ekonomicznych** – np. 200 czy 300 PE – by baza nie była stawiana zbyt często. Alternatywnie lub dodatkowo, można wymagać zużycia pewnej puli **punktów zaopatrzenia** na zapełnienie nowej bazy (co symulowałoby konieczność dostarczenia tam zapasów). Na początek proponujemy prosty koszt w PE, np. *200 PE za bazę*.
+- **Wykonanie budowy:** Gdy gracz wybierze heks, gra:
+  - Sprawdza warunki: gracz musi mieć >= koszt PE, wybrany heks musi być przyjazny (np. znajdujący się pod kontrolą gracza lub na jego terytorium – jeśli wprowadzimy strefy kontroli, ale to przyszłość; na razie można tylko sprawdzić, czy nie ma już tam bazy).
+  - Odejmuje koszt z punktów ekonomicznych (`economy_system.spend_economic_points(nation, cost, "Budowa bazy")` – logika już istnieje).
+  - Dodaje bazę: wywołuje `economy_system.add_base(nation, x, y, supply_limit)`. `supply_limit` nowej bazy może być domyślny (np. 100) lub zależny od zainwestowanych środków (np. 200 PE daje bazę o limit 100; ewentualnie większy koszt mógłby dać bazę o większym limicie, ale trzymajmy się prostego założenia stałego limitu).
+  - Aktualizuje dane mapy/gry: należy dodać wpis o bazie w wewnętrznej strukturze (np. `placed_bases` lub w `hex_data` danego heksu). Warto również wizualnie zaznaczyć bazę na mapie – np. na canvasie narysować symbol (mały kwadrat lub ikonę skrzyni). Można to zrobić podobnie jak rysowane są żetony czy punkty kluczowe (np. funkcją `create_oval` lub wczytując małą grafikę bazy).
+  - Uaktualnia panel ekonomii: baza sama w sobie nie wpływa na PE/PZ, więc wystarczy np. odświeżyć wyświetlaną listę baz w raporcie ekonomicznym. `generate_report` już wypisuje listę baz z ich limitami, więc po dodaniu bazy warto wywołać ponownie `update_economic_info()` aby gracz widział nową bazę w raporcie.
+
+**3. Zarządzanie bazami:** (plan na przyszłość) Można rozważyć dodanie interfejsu do **ulepszania baz** (zwiększania ich limitu zaopatrzenia kosztem PZ lub PE) oraz do przenoszenia/likwidowania baz. Na razie jednak podstawowe stawianie i wykorzystywanie baz jest priorytetem.
+
+### System pogodowy (planowany)
+Warunki pogodowe mogą znacząco wpłynąć na rozgrywkę (ruch, efektywność bojową, zużycie zaopatrzenia). Na ten moment gra nie posiada modułu pogodowego – proponujemy zarysy takiego systemu z myślą o przyszłej implementacji:
+- **Lokalizacja kodu:** Najlepiej umieścić nowy system w module `engine/weather.py` jako klasę `WeatherSystem`. Będzie on analogiczny do innych systemów w katalogu `engine` (tak jak `VisibilitySystem` czy planowany `TurnManager`). Dzięki temu logika pogody będzie odseparowana od GUI i innych elementów.
+- **Reprezentacja pogody:** Klasa WeatherSystem może przechowywać aktualny stan pogody (np. `self.current_weather`) oraz mieć metodę do zmiany na kolejną pogodę (np. `next_turn()` lub `randomize_weather()`). Pogodę można określać jako enum/napis, np. `"Pogodnie"`, `"Deszcz"`, `"Rasputica"`, `"Śnieg"`, itp. wraz z parametrami wpływu.
+- **Wpływ na grę:** Należy zdefiniować, jakie efekty niesie każda pogoda. Przykładowo:
+  - Deszcz: zmniejszenie punktów ruchu jednostek o 1, obniżenie skuteczności lotnictwa (jeśli jest) i zwiększenie kosztu utrzymania (więcej paliwa na pokonywanie błota).
+  - Błoto (rasputica): drastyczne zmniejszenie ruchu pojazdów gąsienicowych i kołowych, piechota mniej dotknięta.
+  - Śnieg/Mróz: zmniejszenie skuteczności bojowej nieprzygotowanych jednostek, większe zapotrzebowanie na zaopatrzenie (paliwo do ogrzewania, wyższe zużycie).
+  - Pogoda dobra: brak modyfikatorów.
+- **Integracja z turami:** WeatherSystem powinien być wywoływany na początku każdej tury (lub co kilka tur, zależnie od scenariusza). Jeśli powstanie klasa `TurnManager` obsługująca fazy, to po zwiększeniu licznika tur można wywołać np. `weather_system.new_turn(turn_number)` by potencjalnie zmienić warunki (np. co turę losować pogodę z pewnym prawdopodobieństwem zmiany). Można też skryptować pogodę w scenariuszu – np. 1 września pogodnie, od 3 września deszcze, itp., poprzez zdefiniowanie listy warunków per tura.
+- **Wpływ na inne systemy:** Np. w `calculate_movement` jednostki można uwzględniać modyfikator ruchu zależnie od `WeatherSystem.current_weather`. Podobnie w systemie zaopatrzenia – w trudnej pogodzie koszt zaopatrzenia per dystans może wzrosnąć (np. baza zaopatrująca oddział daleko zużyje więcej PZ w błocie). Te modyfikacje mogłyby być zaimplementowane w istniejących metodach: np. `calculate_distance`/`find_nearest_base` może dodatkowo mnożyć dystans przez czynnik pogodowy, albo `pay_unit_maintenance` mnożyć koszt.
+- **GUI pogody:** W interfejsie warto wyświetlać aktualną pogodę – np. jako ikonkę i opis przy etykiecie tury (np. „Tura 5 – Deszcz”). 
+
+Implementacja systemu pogodowego będzie nieco izolowana od reszty, więc można ją wprowadzić w dowolnym momencie. W pierwszej iteracji może po prostu losowo zmieniać warunki co kilka tur i wypisywać komunikat (to będzie spójne z zasadą, że nawet niezaimplementowane elementy powinny dawać jakiś komunikat – zgodnie z podejściem skeletonów). Kod najlepiej umieścić w module `engine/weather.py` i importować go w `main.py` oraz/lub `turns.py`. Jeśli nie ma jeszcze zaimplementowanego `TurnManager`, tymczasowo wywołania pogodowe można umieścić w `end_turn()` w `GameInterface` – np. po przełączeniu gracza i zanim nastąpi kolejna tura, zmienić pogodę.
+
+### Usprawnienia edytora mapy (bazy zaop. i punkty kluczowe)
+Edytor mapy (`gui/map_editor.py`) powinien zostać rozbudowany, by obsługiwał również nowe elementy:
+- **Dodawanie baz zaopatrzenia:** Analogicznie do istniejącego mechanizmu punktów kluczowych, dodaj przycisk **„Dodaj bazę zaopatrzenia”**. Po jego kliknięciu użytkownik wybiera heks na mapie, a następnie pojawia się dialog z wyborem nacji (Polska/Niemcy) oraz wpisaniem limitu zaopatrzenia (domyślnie np. 100). Po zatwierdzeniu edytor:
+  - Zapisuje w strukturze `self.bases` nowy wpis. Struktura może być podobna jak proponowany JSON: np. `self.bases = {"Polska": {}, "Niemcy": {}}` i wpis `self.bases["Polska"][hex_id] = {"supply_limit": 100}`.
+  - Rysuje na mapie symbol bazy na wybranym polu (np. niebieski kwadrat dla polskiej, czarny dla niemieckiej bazy, lub litery P/N).
+  - Aktualizuje licznik/label informacyjny (podobnie jak jest `key_point_info_label` dla punktów kluczowych, można mieć `base_info_label` pokazujący szczegóły bazy pod kursorem).
+  - Przy zapisie mapy do pliku dołącza strukturę baz. Jeśli przyjmiemy strukturę per nacja, JSON mógłby być zorganizowany jak wyżej (osobna sekcja). Edytor powinien więc serializować `self.bases` do formatu zgodnego z ustalonym – np. zamienić wewnętrzną reprezentację na słownik z listami baz.
+- **Edycja/usuwanie baz:** Dobrze dodać możliwość usunięcia bazy (np. PPM na bazie lub specjalny przycisk "Usuń bazę" działający podobnie jak usuwanie punktów kluczowych, które w edytorze jest realizowane poprzez czyszczenie całej listy – tu lepiej pojedynczo). Można np. w dialogu dodawania umożliwić też tryb usuwania: kliknięcie bazy gdy aktywny jest przycisk "Dodaj bazę" mogłoby usuwać istniejącą.
+- **Synchronizacja z plikiem:** Edytor podczas wczytywania pliku mapy musi odczytać również bazę (sekcję bases). Np. `loaded_data.get("bases", {})` i odpowiednio zapełnić `self.bases` oraz narysować te bazy na mapie. Podczas zapisu – dopisać do `map_data` klucz `"bases"` i zapisać.
+
+- **Punkty kluczowe – drobne poprawki:** Skoro edytor już obsługuje punkty kluczowe, warto upewnić się, że:
+  - Gdy użytkownik usunie punkt kluczowy (np. wyczyści mapę), zapis usunie go z pliku – obecnie jest opcja usunięcia wszystkich naraz, co działa, ale brak usuwania pojedynczego.
+  - Rozważyć możliwość przypisania punktu kluczowego do konkretnej nacji (chociaż obecnie zakładamy, że wszystkie są neutralne startowo). Można to pominąć, bo gra i tak obsługuje zdobywanie dynamicznie.
+
+Podsumowując, edytor mapy po zmianach pozwoli w pełni przygotować dane scenariusza: oznaczyć ważne miasta i mosty jako punkty kluczowe oraz określić, gdzie znajdują się początkowe bazy zaopatrzenia obu stron. Dzięki temu osoba tworząca scenariusz będzie miała narzędzie do konfiguracji logistyki.
+
+### Generowanie jednostek z wykorzystaniem PE
+Największa zmiana dla rozgrywki to wprowadzenie **systemu rekrutacji jednostek za punkty ekonomiczne**. Proponuje się następujące podejście:
+1. **Oddzielenie „szablonów” jednostek od instancji:** Aktualnie foldery w `tokeny/` pełnią rolę jednocześnie definicji jednostki i pojedynczego żetonu. Aby móc kupować wiele jednostek tego samego typu, warto traktować te foldery jako *wzorce*. Można utrzymać obecną strukturę (każdy folder zawiera obrazek i dane typu jednostki). Natomiast panel żetonów nie powinien od razu zawierać wszystkich tych jednostek jako gotowych do rozstawienia, tylko raczej listę dostępnych do zakupu.
+2. **Interfejs zakupów:** W interfejsie gry, dla każdej nacji, dodaj zakładkę lub panel **„Rekrutacja”**. Może to być część istniejącego panelu żetonów lub osobne okno wywoływane przyciskiem „Kup jednostki”. Przykładowa realizacja w GUI:
+   - Obok nagłówka "Żetony Polskie" dodaj przycisk "+" (lub „Kup”). Po jego kliknięciu otwiera się okno ze spisem dostępnych jednostek dla danej nacji.
+   - Spis może być tabelką: nazwa jednostki, koszt (PE), ewentualnie ikona, przycisk Kup. Ewentualnie lista z opisem i przyciskiem.
+   - Dane do wygenerowania tej listy bierzemy z katalogu `tokeny/nacja/` – czyli np. odczytujemy `token_index.json` dla danej nacji, gdzie są wypisane typy jednostek. Każdy typ ma przypisany `purchase_value` w swoim `token_data.json`. Można więc zbudować listę typu: *„Pluton Piechoty – koszt 18 PE”*, *„Pluton Czołgów Średnich – 22 PE”* itd., używając tych wartości.
+   - Jeśli dana jednostka nie powinna być dostępna (np. prototypy, limitowane), to `token_index.json` lub osobny mechanizm mógłby to oznaczać. Na razie zakładamy, że dostępne są wszystkie zdefiniowane.
+3. **Logika zakupu:** Kiedy gracz wybierze jednostkę i potwierdzi zakup:
+   - Sprawdzamy czy ma wystarczająco PE. Jeśli nie, blokujemy (przycisk nieaktywny) lub komunikat.
+   - Jeśli tak, zmniejszamy **punkty ekonomiczne** nacji o koszt (`economy_system.spend_economic_points(nation, cost, "Zakup jednostki X")`). To automatycznie doda wpis do historii. 
+   - Tworzymy nowy żeton jednostki w panelu. Tu są dwa podejścia:
+     a) **Kopiowanie plików:** Możemy fizycznie skopiować folder wzorca jednostki na nowy unikatowy (np. dodając sufiks liczbowy do nazwy). Np. kupno drugiej piechoty tworzy folder `Polska P Pluton (2)` z plikiem PNG i danymi skopiowanymi z oryginału. Następnie wczytujemy go tak samo jak przy starcie gry (Image, dane) i dodajemy do `TokenPanel`. Zaleta: łatwa integracja z obecną logiką (foldery jako jednostki). Wady: zaśmiecanie struktury plików oraz konieczność czyszczenia ich (co częściowo już jest robione przy `lock_nation_tokens` – usuwa foldery jednostek rozmieszczonych). Jednak ponieważ gra działa lokalnie, a scenariusz nie będzie miał setek jednostek, to kopiowanie jest akceptowalne.
+     b) **Wewnętrzna reprezentacja:** Odejść od kopiowania i przechowywać wiele instancji w pamięci, ale to wymagałoby zmiany struktury `placed_token_images` i panelu tak, by nie bazowały na unikalnej nazwie=folderze. Można np. nadać unikalny identyfikator każdej kupionej jednostce (np. Piechota#1, Piechota#2) i przechowywać tylko referencję do jednego obrazka. To jednak wymaga refaktoryzacji sposobu przechowywania żetonów. W ramach obecnego projektu **prostsze będzie podejście z kopiowaniem** folderów przy zakupie – pozwoli to skorzystać z istniejącego mechanizmu wczytywania i usuwania.
+   - Dodajemy nowy żeton do panelu danej nacji (`TokenPanel.add_token`). Panel już obsługuje wyświetlanie i przeciąganie.
+   - Aktualizujemy wyświetlane zasoby (PE ubyło – więc `update_economic_info()` aby gracz widział nowe wartości punktów).
+4. **Ograniczenia i balans:** Możemy wprowadzić ograniczenie, że zakupu można dokonywać tylko na **początku tury** (np. gdy jednostki są odblokowane w panelu). Wtedy przycisk Kupno jest dostępny tylko jeśli aktualnie jest faza planowania gracza, co można powiązać z flagą `tokens_locked` (jeśli żetony nie są zablokowane, to znaczy można dokupywać). W mechanice turowej typu IGOUGO, zwykle kupno/wystawienie posiłków odbywa się na początku swojej tury – to dobre miejsce, aby nie pozwolić kupować w dowolnym momencie (co mogłoby zaburzyć płynność, np. reakcje na ruch przeciwnika).
+   - Można też ograniczyć miejsca, gdzie nowo kupione jednostki mogą zostać postawione – np. tylko w określonych strefach (przy krawędzi mapy, w pobliżu bazy zaopatrzenia lub miasta). To jednak wymaga mechanizmu kontroli terenu i wykracza poza obecny zakres (można pozostawić graczowi odpowiedzialność, by stawiał posiłki sensownie).
+   - Wsparcie sojuszników i punkty kluczowe zasilają PE gracza, co umożliwi finansowanie tych zakupów – trzeba upewnić się, że gdy takie zdarzenie nastąpi w trakcie tury przeciwnika (np. zdobycie miasta w swojej turze), to dodatkowe PE będą dostępne od razu lub od następnej tury zgodnie z założeniem balansu. Najprościej: **aktualizować PE natychmiast** (co kod `capture_key_point` już robi). Wtedy gracz, jeśli ma jeszcze możliwość rekrutacji w tej turze, mógłby od razu wykorzystać nowo zdobyte punkty – to może być nawet ciekawy element strategiczny.
+
+5. **Zmiany w istniejącym kodzie pod system rekrutacji:**
+   - W funkcji inicjalizacji żetonów w `main.py` zamiast od razu dodawać wszystkie jednostki do paneli, można na starcie załadować listę dostępnych typów (np. do pamięci lub pozostawić tylko w token_index). Panel mógłby startowo być pusty, chyba że scenariusz przewiduje początkowe jednostki (wtedy te konkretne instancje należałoby dodać).
+   - Trzeba usunąć ograniczenie unikalności jednostek w panelu. Obecnie, jeśli dany typ już jest w panelu, ponowne dodanie jest pomijane. To należy zmienić, by **pozwolić na duplikaty**. Jeśli wybierzemy metodę kopiowania folderu, to duplikat będzie miał inny `token_name` (np. dopisek (2)), więc obecna logika nie wykryje go jako ten sam i zadziała bez zmian. Jeśli jednak zdecydowalibyśmy się na identyfikację inaczej, należałoby zmodyfikować metodę `token_exists` w `TokenPanel`.
+   - Warto rozszerzyć strukturę `history` w EconomySystem o wpisy typu „Zakup jednostki X za Y PE” (co już będzie dzięki parametrowi `description` w `spend_economic_points` wykorzystane). Można później te informacje wykorzystać w podsumowaniu.
+
+Po wprowadzeniu powyższych zmian, system będzie działał następująco: **Gracz dysponuje pulą punktów ekonomicznych, za które może rekrutować nowe jednostki, które następnie pojawiają się w jego panelu i mogą zostać rozmieszczone na mapie, generując odpowiednie koszty utrzymania w kolejnych turach.** Dzięki temu ekonomia, zaopatrzenie i siły zbrojne zostaną zintegrowane w spójną całość:
+- jeśli gracz straci wiele jednostek, może wykorzystać zgromadzone PE na uzupełnienia (ale zmniejszy to zasoby, które mógłby przeznaczyć na zaopatrzenie istniejących wojsk),
+- jeśli utrzyma punkty kluczowe i pozyska wsparcie sojuszników, zyska przewagę ekonomiczną pozwalającą wystawić więcej oddziałów,
+- nadmiar posiadanych wojsk bez odpowiedniego zaopatrzenia zmusi go do konwertowania PE na PZ lub budowy dodatkowych baz, co ograniczy tempo produkcji nowych jednostek – zapewni to zdrowy **dylemat strategiczny** i zapobiegnie prostemu zalewaniu mapy wojskiem bez konsekwencji logistycznych.
+
+Wszystkie te elementy razem dadzą bardziej realistyczny i zbalansowany model kampanii Wrześniowej 1939, zachowując przy tym czytelność dzięki odpowiedniemu GUI i strukturze danych.
+
+CO DALEJ – PLAN REALIZACJI (kolejne kroki)
+🎯 ETAP 1: Integracja systemu ekonomii i tur
+Cel: uruchomić działanie PE/PZ i rozpocząć życie ekonomiczne w grze.
+
+Kroki:
+
+ W main.py – dodaj wywołanie economy_system.process_turn(nation) przy końcu tury (w end_turn() lub podobnym).
+
+ Zintegrować random_event() z rozpoczęciem tury.
+
+ W update_economic_info() – pokazywać aktualne PE, PZ i zdarzenia z historii.
+
+ Testowo dodać stały przyrost PZ (np. +300 dla Polski) w process_turn().
+
+🛠️ ETAP 2: GUI konwersji PE → PZ
+Cel: umożliwić graczowi zamianę punktów ekonomicznych na zaopatrzenie.
+
+Kroki:
+
+ Dodaj przycisk „Konwertuj PE na PZ” w panelu ekonomicznym.
+
+ Po kliknięciu – otwórz simpledialog z wyborem liczby PE.
+
+ Wywołaj produce_supply() i uaktualnij panel.
+
+ Zablokuj przycisk, jeśli PE za mało.
+
+🗺️ ETAP 3: Wczytywanie i obsługa baz
+Cel: wczytać bazy z mapy i zasilać nimi jednostki.
+
+Kroki:
+
+ Rozszerz mapa_dane.json o sekcję "bases" (zgodnie z analizą).
+
+ W EconomySystem dodaj load_bases(path) i użyj go przy starcie gry.
+
+ W calculate_maintenance() sprawdzaj bazy i ich limity.
+
+ Na mapie – narysuj bazę (np. mały kwadrat).
+
+🪙 ETAP 4: Panel zakupu żetonów
+Cel: dodać możliwość kupna jednostek za PE.
+
+Kroki:
+
+ Obok panelu jednostek każdej nacji dodaj przycisk „Kup jednostki”.
+
+ Nowe okno: lista jednostek z katalogu tokeny/nacja/, pokazany koszt.
+
+ Po kliknięciu „Kup”:
+
+sprawdź PE,
+
+skopiuj folder jednostki,
+
+dodaj do panelu żetonów nacji,
+
+odejmij PE.
+
+ Zablokuj możliwość kupowania, jeśli tokens_locked == True.
+
+🧰 ETAP 5: Edytor map – bazy zaopatrzenia
+Cel: umożliwić umieszczanie baz w edytorze mapy.
+
+Kroki:
+
+ Dodaj przycisk „Dodaj bazę”.
+
+ Klik na heks → wybór nacji, wpisanie limitu → zapis do mapy.
+
+ Zapis i odczyt do mapa_dane.json z sekcją bases.
+
+🧭 PRIORYTETY
+Jeśli chcesz:
+
+minimalnie działający prototyp: zrób Etap 1–2
+
+pełny model ekonomii: zrób Etap 1–4
+
+pełną integrację map i scenariuszy: zrób Etap 5
+
+❓Decyzja:
+Chcesz zacząć od implementacji Etapu 1 (proces tury + PE/PZ + zdarzenia + raport)?
+Mogę od razu przygotować gotowy kod do wklejenia.

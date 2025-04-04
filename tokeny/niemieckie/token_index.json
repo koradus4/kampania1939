@@ -1,0 +1,68 @@
+{
+  "Niemcy P Pluton": {
+    "directory": "Niemcy P Pluton",
+    "nation": "Niemcy",
+    "unit_type": "P",
+    "unit_size": "Pluton"
+  },
+  "Niemcy K Pluton": {
+    "directory": "Niemcy K Pluton",
+    "nation": "Niemcy",
+    "unit_type": "K",
+    "unit_size": "Pluton"
+  },
+  "Niemcy TC Pluton": {
+    "directory": "Niemcy TC Pluton",
+    "nation": "Niemcy",
+    "unit_type": "TC",
+    "unit_size": "Pluton"
+  },
+  "Niemcy TŚ Pluton": {
+    "directory": "Niemcy TŚ Pluton",
+    "nation": "Niemcy",
+    "unit_type": "TŚ",
+    "unit_size": "Pluton"
+  },
+  "Niemcy TL Pluton": {
+    "directory": "Niemcy TL Pluton",
+    "nation": "Niemcy",
+    "unit_type": "TL",
+    "unit_size": "Pluton"
+  },
+  "Niemcy TS Pluton": {
+    "directory": "Niemcy TS Pluton",
+    "nation": "Niemcy",
+    "unit_type": "TS",
+    "unit_size": "Pluton"
+  },
+  "Niemcy AC Pluton": {
+    "directory": "Niemcy AC Pluton",
+    "nation": "Niemcy",
+    "unit_type": "AC",
+    "unit_size": "Pluton"
+  },
+  "Niemcy AL Pluton": {
+    "directory": "Niemcy AL Pluton",
+    "nation": "Niemcy",
+    "unit_type": "AL",
+    "unit_size": "Pluton"
+  },
+  "Niemcy AP Pluton": {
+    "directory": "Niemcy AP Pluton",
+    "nation": "Niemcy",
+    "unit_type": "AP",
+    "unit_size": "Pluton"
+  },
+  "Niemcy D Pluton": {
+    "directory": "Niemcy D Pluton",
+    "nation": "Niemcy",
+    "unit_type": "D",
+    "unit_size": "Pluton"
+  },
+  "Niemcy G Pluton": {
+    "directory": "Niemcy G Pluton",
+    "nation": "Niemcy",
+    "unit_type": "G",
+    "unit_size": "Pluton"
+  }
+}

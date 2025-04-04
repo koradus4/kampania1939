@@ -1,0 +1,42 @@
+{
+  "terrain": {
+    "4_3": {
+      "move_mod": -2,
+      "defense_mod": 2
+    },
+    "4_4": {
+      "move_mod": -2,
+      "defense_mod": 2
+    },
+    "3_3": {
+      "move_mod": -2,
+      "defense_mod": 2
+    },
+    "5_3": {
+      "move_mod": -2,
+      "defense_mod": 1
+    },
+    "6_4": {
+      "move_mod": -2,
+      "defense_mod": 1
+    },
+    "7_4": {
+      "move_mod": -2,
+      "defense_mod": 1
+    }
+  },
+  "key_points": {
+    "4_3": {
+      "type": "miasto",
+      "value": 100
+    },
+    "4_4": {
+      "type": "miasto",
+      "value": 100
+    },
+    "3_3": {
+      "type": "miasto",
+      "value": 100
+    }
+  }
+}
