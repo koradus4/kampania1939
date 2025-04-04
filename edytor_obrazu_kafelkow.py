@@ -91,6 +91,10 @@ class HexEditor:
         self.resolution_label = tk.Label(self.controls_frame, text="Rozdzielczość tła: 100%", bg="darkolivegreen", fg="white", font=("Arial", 12))
         self.resolution_label.pack(side=tk.LEFT, padx=10)
 
+        # Okno wyświetlające aktualną rozdzielczość
+        self.resolution_display = tk.Label(self.controls_frame, text="700 x 700 px", bg="white", fg="black", font=("Arial", 12), width=15, relief=tk.SUNKEN, anchor="center")
+        self.resolution_display.pack(side=tk.LEFT, padx=5)
+
         self.resolution_scale = tk.Scale(self.controls_frame, from_=10, to=500, orient=tk.HORIZONTAL, length=300, command=self.update_resolution)
         self.resolution_scale.set(100)  # Domyślna wartość 100%
         self.resolution_scale.pack(side=tk.LEFT, padx=5)
@@ -136,6 +140,7 @@ class HexEditor:
             
             # Aktualizacja etykiety z rozdzielczością
             self.resolution_label.config(text=f"Rozdzielczość tła: {new_width} x {new_height} px ({int(value)}%)")
+            self.resolution_display.config(text=f"{new_width} x {new_height} px")  # Aktualizacja okna z rozdzielczością
             
             # Aktualizacja canvasu
             self.update_canvas()
