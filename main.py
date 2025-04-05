@@ -674,15 +674,30 @@ class GameInterface(tk.Tk):
         end_turn_button = ttk.Button(self.top_frame, text="Zakończ turę", command=self.end_turn, style="Military.TButton")
         end_turn_button.pack(side="left", padx=5)
         
+        # Dodanie nowych przycisków "Zakup żetony" i "Wystaw żetony"
+        purchase_tokens_button = ttk.Button(self.top_frame, text="Zakup żetony", command=self.purchase_tokens, style="Military.TButton")
+        purchase_tokens_button.pack(side="left", padx=(20, 5))  # Mała przerwa między "Zakończ turę" a nowymi przyciskami
+        
+        deploy_tokens_button = ttk.Button(self.top_frame, text="Wystaw żetony", command=self.deploy_tokens, style="Military.TButton")
+        deploy_tokens_button.pack(side="left", padx=5)
+        
+        # Przyciski po prawej stronie
         btn3 = ttk.Button(self.top_frame, text="Wyjście", command=self.quit, style="Military.TButton")
         btn3.pack(side="right", padx=10)
         
-        # Przeniesienie przycisków "Zapisz grę" i "Wczytaj grę" na koniec prawej strony
         load_btn = ttk.Button(self.top_frame, text="Wczytaj grę", command=self.load_game, style="Military.TButton")
         load_btn.pack(side="right", padx=5)
         
         save_btn = ttk.Button(self.top_frame, text="Zapisz grę", command=self.save_game, style="Military.TButton")
         save_btn.pack(side="right", padx=5)
+
+    def purchase_tokens(self):
+        """Obsługuje zakup żetonów."""
+        messagebox.showinfo("Zakup żetonów", "Funkcja zakupu żetonów nie została jeszcze zaimplementowana.")
+
+    def deploy_tokens(self):
+        """Obsługuje wystawianie żetonów."""
+        messagebox.showinfo("Wystaw żetony", "Funkcja wystawiania żetonów nie została jeszcze zaimplementowana.")
 
     def get_current_turn_nation(self):
         """Zwraca nazwę nacji na podstawie aktualnej tury."""
